@@ -2,6 +2,8 @@ package com.example.application;
 
 import java.io.*;
 import java.sql.*;
+import java.util.Optional;
+
 import jakarta.servlet.http.*;
 
 public class NewTransactionServlet extends HttpServlet {
@@ -13,19 +15,41 @@ public class NewTransactionServlet extends HttpServlet {
     public void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         response.setContentType("text/html");
 
-        Integer playerId = Integer.parseInt(request.getParameter("playerId"));
-        Integer clanId = Integer.parseInt(request.getParameter("clanId"));
-        Integer money = Integer.parseInt(request.getParameter("moneyAmount"));
+        Integer playerId = Optional.ofNullable(request.getParameter("playerId"))
+                .map(Integer::parseInt)
+                .orElseThrow(() -> new IllegalStateException("playerId is null"));
+        Integer clanId = Optional.ofNullable(getClanId(playerId))
+                .orElseThrow(() -> new IllegalStateException("player has no clan"));
+        Integer money = Optional.ofNullable(request.getParameter("moneyAmount"))
+                .map(Integer::parseInt)
+                .orElseThrow(() -> new IllegalStateException("moneyAmount is empty"));
         String action = request.getParameter("action");
-        Long transId = newTrans(playerId, clanId, action, money);
-        Integer checkUpd = updateClansGold(clanId, money);
-        String message = "Транзакция выполнена успешно, номер транзакции: " + transId +
-                "\nИндикатор обновления: " + checkUpd;
+        long transId = newTrans(playerId, clanId, action, money);
+        updateClansGold(clanId, money);
+        String message = "Транзакция выполнена успешно, номер транзакции: " + transId;
 
         PrintWriter out = response.getWriter();
         out.println("<html><body>");
         out.println("<h1>" + message + "</h1>");
         out.println("</body></html>");
+    }
+
+    public Integer getClanId(Integer playerId) {
+        String SQL = "select clan_id from player"
+                + "where player_id = ?";
+        Integer result = null;
+        try (
+            Connection connection = connect();
+            PreparedStatement pstmt = connection.prepareStatement(SQL)) {
+
+                pstmt.setInt(1, playerId);
+                ResultSet rs = pstmt.executeQuery();
+                if (rs.next())
+                    result = Integer.parseInt(rs.getString("clan_id"));
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return result;
     }
 
     public Connection connect() throws SQLException {
@@ -70,8 +94,7 @@ public class NewTransactionServlet extends HttpServlet {
         return id;
     }
 
-    public Integer updateClansGold(Integer clanId, Integer money) {
-        Integer affectedrows = 0;
+    public void updateClansGold(Integer clanId, Integer money) {
         String SQL = "UPDATE clan "
                 + "SET gold = gold + ?"
                 + "WHERE clan_id = ?";
@@ -81,11 +104,10 @@ public class NewTransactionServlet extends HttpServlet {
 
             pstmt.setInt(1, money);
             pstmt.setInt(2, clanId);
-            affectedrows = pstmt.executeUpdate();
+            pstmt.executeUpdate();
 
         } catch (SQLException ex) {
             ex.printStackTrace();
         }
-        return affectedrows;
     }
 }
