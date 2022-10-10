@@ -15,25 +15,32 @@ public class NewTransactionServlet extends HttpServlet {
     public void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         response.setContentType("text/html");
 
+        //Извлекаем параметры из URL
         Integer playerId = Optional.ofNullable(request.getParameter("playerId"))
                 .map(Integer::parseInt)
                 .orElseThrow(() -> new IllegalStateException("playerId is null"));
+
         Integer clanId = Optional.ofNullable(getClanId(playerId))
                 .orElseThrow(() -> new IllegalStateException("player has no clan"));
+
         Integer money = Optional.ofNullable(request.getParameter("moneyAmount"))
                 .map(Integer::parseInt)
                 .orElseThrow(() -> new IllegalStateException("moneyAmount is empty"));
         String action = request.getParameter("action");
+
         long transId = newTrans(playerId, clanId, action, money);
         updateClansGold(clanId, money);
-        String message = "Транзакция выполнена успешно, номер транзакции: " + transId;
 
+        String message = "Транзакция выполнена успешно, номер транзакции: " + transId;
         PrintWriter out = response.getWriter();
         out.println("<html><body>");
         out.println("<h1>" + message + "</h1>");
         out.println("</body></html>");
     }
 
+
+
+    //метод возвращает id клана, на вход подается id игрока
     public Integer getClanId(Integer playerId) {
         String SQL = "select clan_id from player"
                 + "where player_id = ?";
@@ -52,6 +59,9 @@ public class NewTransactionServlet extends HttpServlet {
         return result;
     }
 
+
+
+    //подключение к БД
     public Connection connect() throws SQLException {
         try {
             Class.forName("org.postgresql.Driver");
@@ -64,6 +74,7 @@ public class NewTransactionServlet extends HttpServlet {
 
 
 
+    //новая транзакция, метод возвращает id транзакции
     public long newTrans(Integer playerId, Integer clanId, String action, Integer money) {
         String SQL = "INSERT INTO transactions (player_id, clan_id, action, money) "
                 + "VALUES(?,?,?,?)";
@@ -94,6 +105,9 @@ public class NewTransactionServlet extends HttpServlet {
         return id;
     }
 
+
+
+    //метод обновляет казну клана
     public void updateClansGold(Integer clanId, Integer money) {
         String SQL = "UPDATE clan "
                 + "SET gold = gold + ?"
